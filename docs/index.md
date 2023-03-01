@@ -12,7 +12,7 @@ hero:
   actions:
     - theme: brand
       text: 开始学习 →
-      link: /articles/index
+      link: /articles/vue/introduction
     # - theme: alt
     #   text: 获取项目
     #   link: /intent/index

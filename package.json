@@ -11,6 +11,9 @@
     "docs:serve": "vitepress serve docs"
   },
   "devDependencies": {
+    "directory-tree": "^3.5.1",
+    "sass": "^1.58.3",
     "vitepress": "^1.0.0-alpha.48"
-  }
+  },
+  "dependencies": {}
 }
