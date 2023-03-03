@@ -22,7 +22,7 @@ module.exports = {
             //         { text: '概况', link: '/articles/' },
             //         { text: 'Vue', link: '/articles/vue' },
             //     ]
-            // }],   
+            // }],    
         },
         socialLinks: [{ icon: "github", link: "https://github.com/Y-Linkzz/Y-Linkzz.github.io" }],
     }
