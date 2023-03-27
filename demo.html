@@ -9,17 +9,63 @@
 <body>
     
     <script>
-        let dom = document.createElement('p')
-        dom.setAttribute('title', '" onclick="alert(\'hi\')')
-        // dom.innerText = '<script>'
-        const { innerHTML, innerText, textContent , outerHTML } = dom
-        console.log([dom])
-        console.log({
-            innerHTML,
-            innerText,
-            textContent,
-            outerHTML
+        // let dom = document.createElement('p')
+        // dom.setAttribute('title', '" onclick="alert(\'hi\')')
+        // // dom.innerText = '<script>'
+        // const { innerHTML, innerText, textContent , outerHTML } = dom
+        // console.log([dom])
+        // console.log({
+        //     innerHTML,
+        //     innerText,
+        //     textContent,
+        //     outerHTML
+        // })
+        let start = Date.now()
+
+        // let sum = function (a, b) {
+        //     return Number(a) + Number(b);
+        // }
+        // let res = [];
+        // for (let i = 0; i < 5000000; i++) {
+        //     let a = Math.floor(Math.random() * 100);
+        //     let b = Math.floor(Math.random() * 200);
+        //     res.push(sum(a, b));
+        // }
+        // res = res.sort();
+
+        console.log(4, Date.now() - start);
+
+        Promise.resolve().then(() => {
+            let sum = function (a, b) {
+                return Number(a) + Number(b);
+            }
+            let res = [];
+            for (let i = 0; i < 5000000; i++) {
+                let a = Math.floor(Math.random() * 100);
+                let b = Math.floor(Math.random() * 200);
+                res.push(sum(a, b));
+            }
+            res = res.sort();
+            console.log(5, Date.now() - start);
         })
+
+        Promise.resolve().then(() => {
+            console.log(3, Date.now() - start);
+        })
+
+        // setTimeout(() => {
+        //     // let sum = function (a, b) {
+        //     //     return Number(a) + Number(b);
+        //     // }
+        //     // let res = [];
+        //     // for (let i = 0; i < 5000000; i++) {
+        //     //     let a = Math.floor(Math.random() * 100);
+        //     //     let b = Math.floor(Math.random() * 200);
+        //     //     res.push(sum(a, b));
+        //     // }
+        //     // res = res.sort();
+        //     console.log(2, Date.now() - start);
+        // }, 2000);
     </script>
 </body>
 </html>
