@@ -1,5 +1,7 @@
 # Event Loop 事件循环
 
+[文章](https://juejin.cn/post/6844903998747574286#heading-3)
+
 ## 为什么JavaScript是单线程？
 
 JavaScript的主要用途是与用户互动，以及操作DOM。比如，假定JavaScript同时有两个线程，一个线程在某个DOM节点上添加内容，另一个线程删除了这个节点，这时浏览器应该以哪个线程为准？
@@ -36,8 +38,6 @@ Promise.then、 MutationObserver(优先级小于Promise，
 -   渲染完毕后，JS线程继续接管，开始下一个宏任务（从事件队列中获取）
 
 ![](/EventLoop.png)
-
-<!-- ![](2023-03-27-16-05-04.png) -->
 
 ## setTimeout 异步
 

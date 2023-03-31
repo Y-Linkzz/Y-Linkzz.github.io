@@ -11,7 +11,7 @@ module.exports = {
         nav: [
             { text: '首页', link: '/' },
             { text: '文章', link: '/articles/' },
-        ],
+        ], 
         sidebar: {
             'articles': autoGetSidebarOptionBySrcDir(path.resolve(__dirname, "../articles"))
             // 'articles': [{
