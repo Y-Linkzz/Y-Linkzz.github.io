@@ -120,5 +120,9 @@ https://blog.csdn.net/snsHL9db69ccu1aIKl9r/article/details/121709608
 **二进制**  
 0b开头表示2进制，浏览器都会将其转换为10进制输出。
 
+https://zhuanlan.zhihu.com/p/99082236  
+https://www.w3school.com.cn/js/js_bitwise.asp  
+https://blog.csdn.net/m0_67502005/article/details/128036344  
+
 
 
