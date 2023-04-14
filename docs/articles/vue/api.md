@@ -1,0 +1,357 @@
+# Vue Api
+
+## nextTick()
+当你在 Vue 中更改响应式状态时，最终的 DOM 更新并不是同步生效的，而是由 Vue 将它们缓存在一个队列中，直到下一个“tick”才一起执行。这样是为了确保每个组件无论发生多少状态改变，都仅执行一次更新。
+
+
+## setup()  组合式 API
+通常只在以下情况下使用：
+1. 需要在非单文件组件中使用组合式 API 时。
+2. 需要在基于选项式 API 的组件中集成基于组合式 API 的代码时。
+
+```html
+    <script>
+    import { ref } from 'vue'
+
+    export default {
+    setup() {
+        const count = ref(0)
+
+        // 返回值会暴露给模板和其他的选项式 API 钩子
+        return {
+        count
+        }
+    },
+
+    mounted() {
+        console.log(this.count) // 0
+    }
+    }
+    </script>
+
+    <template>
+    <button @click="count++">{{ count }}</button>
+    </template>
+```
+在模板中访问从 `setup` 返回的 `ref` 时，它会`自动浅层解包`，因此你无须**再在模板中为它写 .value**。当通过 this 访问时也会同样如此解包。
+
+`setup()` **自身并不含对组件实例的访问权**，即在 `setup()` 中访问 `this` 会是 `undefined`。你可以在选项式 API 中访问组合式 API 暴露的值，但反过来则不行。
+
+`setup()` **应该同步地返回一个对象**。唯一可以使用 async setup() 的情况是，该组件是 Suspense 组件的后裔。
+
+### 访问 Props
+
+`setup` 函数的第一个参数是组件的 `props`。和标准的组件一致，一个 `setup` 函数的 `props` 是**响应式的**，并且会在传入新的 props 时同步更新。
+
+请注意如果你解构了 `props` 对象，**解构出的变量将会丢失响应性**。因此我们推荐通过 props.xxx 的形式来使用其中的 props。
+
+### Setup 上下文
+```js
+    export default {
+        setup(props, context) {
+            // 透传 Attributes（非响应式的对象，等价于 $attrs）
+            console.log(context.attrs)
+
+            // 插槽（非响应式的对象，等价于 $slots）
+            console.log(context.slots)
+
+            // 触发事件（函数，等价于 $emit）
+            console.log(context.emit)
+
+            // 暴露公共属性（函数）
+            console.log(context.expose)
+        }
+    }
+
+    // 该上下文对象是非响应式的，可以安全地解构：
+    export default {
+        setup(props, { attrs, slots, emit, expose }) {
+            ...
+        }
+    }
+```
+`attrs` 和 `slots` 都是有状态的对象，它们总是会随着组件自身的更新而更新。这意味着你**应当避免解构它们**，并始终通过 `attrs.x` 或 `slots.x` 的形式使用其中的属性。此外还需注意，和 props 不同，**attrs 和 slots 的属性都不是响应式的**。如果你想要基于 attrs 或 slots 的改变来执行副作用，那么你应该在 `onBeforeUpdate` 生命周期钩子中编写相关逻辑。
+
+### 暴露公共属性
+`expose` 函数用于显式地限制该组件暴露出的属性，当父组件通过模板引用访问该组件的实例时，将仅能访问 `expose` 函数暴露出的内容
+```js
+    export default {
+        setup(props, { expose }) {
+            // 让组件实例处于 “关闭状态”
+            // 即不向父组件暴露任何东西
+            expose()
+
+            const publicCount = ref(0)
+            const privateCount = ref(0)
+            // 有选择地暴露局部状态
+            expose({ count: publicCount })
+        }
+    }
+```
+
+### 与渲染函数一起使用
+`setup` 也可以返回一个**渲染函数**，此时在渲染函数中可以直接使用在同一作用域下声明的响应式状态：
+```js
+    import { h, ref } from 'vue'
+
+    export default {
+        setup() {
+            const count = ref(0)
+            return () => h('div', count.value)
+        }
+    }
+```
+返回一个渲染函数将会阻止我们返回其他东西。对于组件内部来说，这样没有问题，但**如果我们想通过模板引用将这个组件的方法暴露给父组件，那就有问题了**。
+
+我们可以通过调用 `expose()` 解决这个问题：
+```js
+    import { h, ref } from 'vue'
+
+    export default {
+        setup(props, { expose }) {
+            const count = ref(0)
+            const increment = () => ++count.value
+
+            expose({
+                increment
+            })
+
+            return () => h('div', count.value)
+        }
+    }
+```
+
+## ref()
+`ref` 对象是可更改的，也就是说你可以为 .value 赋予新的值。它也是响应式的，即所有对 .value 的操作都将被追踪，并且写操作会触发与之相关的副作用。  
+
+如果将一个`对象`赋值给 `ref`，那么这个`对象`将通过 **reactive() 转为具有深层次响应式的对象**。这也意味着如果对象中包含了嵌套的 ref，它们将被深层地解包。  
+
+若要避免这种深层次的转换，请使用 [shallowRef()](https://cn.vuejs.org/api/reactivity-advanced.html#shallowref) 来替代。
+
+**什么是解包**：被访问或更改时, 不需要使用 .value
+
+### ref 在模板中的解包
+```html
+    <script setup>
+    import { ref } from 'vue'
+
+    const count = ref(0)
+
+    function increment() {
+        count.value++
+    }
+    </script>
+
+    <template>
+        <button @click="increment">
+            {{ count }} <!-- 无需 .value -->
+        </button>
+    </template>
+```
+
+请注意，仅当 `ref` 是**模板渲染上下文**的**顶层属性**时才适用自动“**解包**”。 例如， `object` 是**顶层属性**，但 `object.foo` 不是。
+```html
+    <script setup>
+    import { ref } from 'vue'
+
+    const object = { foo: ref(1) }
+
+    // 我们可以通过将 foo 改成顶层属性来解决这个问题：
+    const { foo } = object
+
+    </script>
+
+    <template>
+        <p>
+            <!-- 不会像预期的那样工作，渲染的结果会是一个 [object Object]1，  
+            因为 object.foo 是一个 ref 对象。 -->
+            {{ object.foo + 1 }} 
+
+            <!-- 如果一个 ref 是文本插值（即一个 {{ }} 符号）计算的最终值，  
+            它也将被解包。因此下面的渲染结果将为 1： -->
+            {{ object.foo }}  // 相当于 {{ object.foo.value }}
+
+            {{ foo + 1 }} // 结果为 2
+        </p>
+    </template>
+```
+
+### ref 响应式对象中的解包
+当一个 `ref` 被**嵌套在一个响应式对象中**，作为**属性被访问或更改时**，它会**自动解包**，因此会表现得和一般的属性一样：
+```js
+    const count = ref(0)
+    const state = reactive({
+        count
+    })
+
+    console.log(state.count) // 0
+
+    state.count = 1
+    console.log(count.value) // 1
+```
+只有当**嵌套在一个深层响应式对象内时**，才会发生 `ref` **解包**。当其作为**浅层响应式对象**(`shallowReactive`)的属性被访问时不会解包。
+
+### 数组和集合类型的 ref 解包
+当 `ref` 作为`响应式数组`或像 `Map` 这种原生集合类型的元素被访问时，**不会进行解包**。
+```js
+    const books = reactive([ref('Vue 3 Guide')])
+    // 这里需要 .value
+    console.log(books[0].value)
+
+    const map = reactive(new Map([['count', ref(0)]]))
+    // 这里需要 .value
+    console.log(map.get('count').value)
+```
+
+
+## reactive()
+返回一个对象的响应式代理。  
+响应式转换是“深层”的：**它会影响到所有嵌套的属性**。一个响应式对象也将深层地`解包任何 ref 属性`，同时保持响应性。  
+
+访问到`某个响应式数组`或 `Map` 这样的原生集合类型中的 `ref` 元素时，**不会执行 ref 的解包**。
+
+若要**避免深层响应式转换**，只想**保留对这个对象顶层次访问的响应性**，请使用 `shallowReactive()` 作替代。 
+
+返回的对象以及其中嵌套的对象都会通过 `ES Proxy` 包裹，因此**不等于源对象**，**建议只使用响应式代理**，避免使用原始对象。
+
+## readonly()
+接受一个对象 (不论是响应式还是普通的) 或是一个 ref，返回**一个原值的只读代理**。  
+**只读代理是深层的**：对任何嵌套属性的访问都将是只读的。它的 `ref` 解包行为与 `reactive()` 相同，但解包得到的值是**只读**的  
+要避免深层级的转换行为，请使用 `shallowReadonly()` 作替代。
+
+
+## computed()
+接受一个 getter 函数，**返回一个只读的响应式 `ref`对象**。它也可以接受一个带有 get 和 set 函数的对象来创建一个可写的 ref 对象。
+
+
+只读的计算属性 ref：
+```js
+    const count = ref(1)
+    const plusOne = computed(() => count.value + 1)
+
+    console.log(plusOne.value) // 2
+
+    plusOne.value++ // 错误
+```
+
+可写的计算属性 ref：
+```js
+    const count = ref(1)
+    const plusOne = computed({
+        get: () => count.value + 1,
+        set: (val) => {
+            count.value = val - 1
+        }
+    })
+
+    plusOne.value = 1
+    console.log(count.value) // 0
+```
+
+## watch()
+侦听一个或多个响应式数据源，并在数据源变化时调用所给的回调函数。  
+`watch()` 默认是懒侦听的，即仅在侦听源发生变化时才执行回调函数。
+第一个参数是侦听器的源。这个来源可以是以下几种：
+-   一个函数(getter 函数)，返回一个值
+-   一个 ref (包括计算属性)
+-   一个响应式对象
+-   或是由以上类型的值组成的数组
+
+**你不能直接侦听响应式对象的属性值**，例如:
+```js
+    const obj = reactive({ count: 0 })
+
+    // 错误，因为 watch() 得到的参数是一个 number
+    watch(obj.count, (count) => {
+    console.log(`count is: ${count}`)
+    })
+```
+
+直接给 `watch()` 传入一个**响应式对象**，会**隐式地创建一个深层侦听器**——该回调函数在所有嵌套的变更时都会被触发：
+```js
+    const obj = reactive({ count: 0 })
+
+    watch(obj, (newValue, oldValue) => {
+    // 在嵌套的属性变更时触发
+    // 注意：`newValue` 此处和 `oldValue` 是相等的
+    // 因为它们是同一个对象！
+    })
+
+    obj.count++
+
+    // 相比之下，一个返回响应式对象的 getter 函数，只有在返回不同的对象时，才会触发回调：
+    watch(
+        () => state.someObject,
+        () => {
+            // 仅当 state.someObject 被替换时触发
+        }
+    )
+
+    watch(
+        () => state.someObject,
+        (newValue, oldValue) => {
+            // 注意：`newValue` 此处和 `oldValue` 是相等的
+            // *除非* state.someObject 被整个替换了
+        },
+        { deep: true } // 强制转成深层侦听器, 谨慎使用
+    )
+    // 深度侦听需要遍历被侦听对象中的所有嵌套的属性，当用于大型数据结构时，开销很大。  
+    // 因此请只在必要时才使用它，并且要留意性能。
+```
+https://cn.vuejs.org/api/reactivity-core.html#watch  
+https://cn.vuejs.org/guide/essentials/watchers.html#watcheffect
+
+## watchEffect()
+立即运行一个函数，同时响应式地追踪其依赖，并在依赖更改时重新执行。(立即执行是为了追踪依赖)
+
+**第一个参数就是要运行的副作用函数**。这个副作用函数的参数也是一个函数，用来注册清理回调。
+`清理回调`会在该`副作用下一次执行前被调用`，可以**用来清理无效的副作用**   
+
+**第二个参数是一个可选的选项**，可以用来**调整副作用的刷新时机**或**调试副作用的依赖**。  
+
+副作用清除：
+```js
+    watchEffect(async (onCleanup) => {
+        const { response, cancel } = doAsyncWork(id.value)
+        // `cancel` 会在 `id` 更改时调用
+        // 以便取消之前
+        // 未完成的请求
+        onCleanup(cancel) // 第一次执行不会调用，下一次执行前被调用
+        data.value = await response
+    })
+```
+
+停止侦听器：
+```js
+    const stop = watchEffect(() => {})
+
+    // 当不再需要此侦听器时:
+    stop()
+```
+
+**回调的触发时机**: 当你更改了响应式状态，它可能会**同时触发** `Vue 组件更新`和`侦听器回调`。
+默认情况下，用户创建的`侦听器回调`，都会在 `Vue 组件更新`之前被调用。
+选项：
+```js
+    watchEffect(() => {}, {
+        flush: 'post', // 使侦听器延迟到组件渲染之后再执行
+        flush: 'sync', // 响应式依赖发生改变时立即触发侦听器
+        onTrack(e) {
+            debugger
+        },
+        onTrigger(e) {
+            debugger
+        }
+    })
+
+    watchPostEffect(() => {
+        /* 在 Vue 更新后执行 */
+    })
+
+    watchSyncEffect(() => {
+        /* 响应式依赖发生改变时立即触发侦听器 */
+    })
+```
+
+
+
