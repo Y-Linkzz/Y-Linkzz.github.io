@@ -1,4 +1,4 @@
-# Vue Api
+# Vue Api [學習源碼](https://github.com/cuixiaorui/mini-vue)
 
 ## nextTick()
 当你在 Vue 中更改响应式状态时，最终的 DOM 更新并不是同步生效的，而是由 Vue 将它们缓存在一个队列中，直到下一个“tick”才一起执行。这样是为了确保每个组件无论发生多少状态改变，都仅执行一次更新。
@@ -290,6 +290,7 @@
     watch(
         () => state.someObject,
         (newValue, oldValue) => {
+            // 侦听的是对象 newValue === oldValue
             // 注意：`newValue` 此处和 `oldValue` 是相等的
             // *除非* state.someObject 被整个替换了
         },
@@ -297,12 +298,65 @@
     )
     // 深度侦听需要遍历被侦听对象中的所有嵌套的属性，当用于大型数据结构时，开销很大。  
     // 因此请只在必要时才使用它，并且要留意性能。
-```
-https://cn.vuejs.org/api/reactivity-core.html#watch  
-https://cn.vuejs.org/guide/essentials/watchers.html#watcheffect
 
-## watchEffect()
+    // 当直接侦听一个响应式对象时，侦听器会自动启用深层模式：
+    const state = reactive({ count: 0 })
+    watch(state, () => {
+    /* 深层级变更状态所触发的回调 */
+    })
+
+    // 当侦听多个来源时，回调函数接受两个数组，分别对应来源数组中的新值和旧值：
+    watch([fooRef, barRef], ([foo, bar], [prevFoo, prevBar]) => {
+    /* ... */
+    })
+
+    // 副作用清理：
+    watch(id, async (newId, oldId, onCleanup) => {
+        const { response, cancel } = doAsyncWork(newId)
+        // 当 `id` 变化时，`cancel` 将被调用，
+        // 取消之前的未完成的请求
+        onCleanup(cancel)
+        data.value = await response
+    })
+```
+
+## watchEffect() 
 立即运行一个函数，同时响应式地追踪其依赖，并在依赖更改时重新执行。(立即执行是为了追踪依赖)
+-   **多个依赖项**时，使用；
+-   **需要侦听一个嵌套数据结构中的几个属性**（比深度侦听器更有效，它将只跟踪回调中被使用到的属性，而不是递归地跟踪所有的属性。）
+-   如果在**异步回调**创建一个侦听器，它不会绑定到当前组件上，你必须手动停止它，以防内存泄漏。如下方这个例子：
+```html
+    <script setup>
+    import { watchEffect } from 'vue'
+
+    // 它会自动停止
+    watchEffect(() => {})
+
+    // ...这个则不会！
+    setTimeout(() => {
+    watchEffect(() => {})
+    }, 100)
+
+
+    // 需要异步创建侦听器的情况很少，请尽可能选择同步创建。如果需要等待一些异步数据，  
+    // 你可以使用条件式的侦听逻辑：
+
+    // 需要异步请求得到的数据
+    const data = ref(null)
+
+    watchEffect(() => {
+        if (data.value) {
+            // 数据加载后执行某些操作...
+        }
+    })
+    </script>
+```
+
+::: tip
+`watchEffect` 仅会在其同步执行期间，才追踪依赖。在使用**异步回调**时，  
+只有在**第一个 await 正常工作前**访问到的属性才会被追踪。（即异步里的属性不会被追踪）
+:::
+
 
 **第一个参数就是要运行的副作用函数**。这个副作用函数的参数也是一个函数，用来注册清理回调。
 `清理回调`会在该`副作用下一次执行前被调用`，可以**用来清理无效的副作用**   
@@ -352,6 +406,171 @@ https://cn.vuejs.org/guide/essentials/watchers.html#watcheffect
         /* 响应式依赖发生改变时立即触发侦听器 */
     })
 ```
+## watch vs. watchEffect
+watch 和 watchEffect 都能**响应式地执行有副作用的回调**，都享有相同的刷新时机和调试选项
+
+-   watch默认是懒侦听的（侦听源发生变化时才执行回调函数），watchEffect是立即执行的（这么做事为了追踪响应式属性）
+-   watch可以更明确是哪个状态触发的侦听器；watchEffect 不那么明确
+-   watch可以访问所侦听状态的新值和旧值
 
 
+## 响应式 API：工具函数
 
+### isRef() : 检查某个值是否为 ref。
+
+### unref()
+如果参数是 ref，则返回内部值，否则返回参数本身;  
+这是 `val = isRef(val) ? val.value : val` 计算的一个**语法糖**
+
+### toRef()
+基于响应式对象上的一个属性，创建一个对应的 ref。这样创建的 ref 与其源属性保持同步：改变源属性的值将更新 ref 的值，反之亦然。
+
+**即使源属性当前不存在**，`toRef()` 也会返回一个**可用的** `ref`。这让它在处理**可选 props 的时候格外实用**，相比之下 `toRefs` 就不会为可选 props 创建对应的 refs。
+```js
+    const state = reactive({
+        foo: 1,
+        bar: 2
+    })
+
+    const fooRef = toRef(state, 'foo')
+
+    // 更改该 ref 会更新源属性
+    fooRef.value++
+    console.log(state.foo) // 2
+
+    // 更改源属性也会更新该 ref
+    state.foo++
+    console.log(fooRef.value) // 3
+
+
+    // 请注意，这不同于：
+    const fooRef = ref(state.foo)
+    // 上面这个 ref 不会和 state.foo 保持同步，因为这个 ref() 接收到的是一个纯数值。
+```
+
+### toRefs()  ： `响应式对象` 可以解构/展开返回的对象而不会失去响应性 (组合式函数)
+将一个响应式对象转换为一个普通对象，这个普通对象的每个属性都是指向源对象相应属性的 ref。  
+
+`toRefs` 在调用时只会为源对象上**可以枚举的属性**创建 ref。如果要为可能还**不存在的属性**创建 `ref`，请改用 `toRef`。
+
+```js
+    const state = reactive({
+        foo: 1,
+        bar: 2
+    })
+
+    const stateAsRefs = toRefs(state)
+    /*
+    stateAsRefs 的类型：{
+    foo: Ref<number>,
+    bar: Ref<number>
+    }
+    */
+
+    // 这个 ref 和源属性已经“链接上了”
+    state.foo++
+    console.log(stateAsRefs.foo.value) // 2
+
+    stateAsRefs.foo.value++
+    console.log(state.foo) // 3
+```
+
+组合式函数例子:
+```js
+    function useFeatureX() {
+        const state = reactive({
+            foo: 1,
+            bar: 2
+        })
+
+        // ...基于状态的操作逻辑
+
+        // 在返回时都转为 ref
+        return toRefs(state)
+    }
+
+    // 可以解构而不会失去响应性
+    const { foo, bar } = useFeatureX()
+```
+
+### isProxy()
+检查一个对象是否是由 `reactive()`、`readonly()`、`shallowReactive()` 或 `shallowReadonly()` 创建的代理。
+
+### isReactive()
+检查一个对象是否是由 `reactive()` 或 `shallowReactive()` 创建的代理。
+
+### isReadonly()
+通过 `readonly()` 和 `shallowReadonly()` 创建的代理都是只读的，因为他们是没有 `set` 函数的 `computed()` ref。
+
+### shallowRef()  用于处理庞大的列表数据
+`浅层ref` 的**内部值将会原样存储和暴露**，并且**不会被深层递归地转为响应式**。只有对 `.value` 的访问是响应式的。
+
+```js
+    const state = shallowRef({ count: 1 })
+
+    // 不会触发更改
+    state.value.count = 2
+
+    // 会触发更改
+    state.value = { count: 2 }
+```
+
+### triggerRef()
+强制触发依赖于一个`浅层 ref` 的副作用，这通常在对浅引用的内部值进行深度变更后使用。
+```js
+    const shallow = shallowRef({
+        greet: 'Hello, world'
+    })
+
+    // 触发该副作用第一次应该会打印 "Hello, world"
+    watchEffect(() => {
+        console.log(shallow.value.greet)
+    })
+
+    // 这次变更不应触发副作用，因为这个 ref 是浅层的
+    shallow.value.greet = 'Hello, universe'
+
+    // 打印 "Hello, universe"
+    triggerRef(shallow)
+```
+
+### customRef() 防抖
+创建一个自定义的 ref，显式声明对其依赖追踪和更新触发的控制方式。
+
+```js
+    import { customRef } from 'vue'
+
+    export function useDebouncedRef(value, delay = 200) {
+        let timeout
+        return customRef((track, trigger) => {
+            return {
+                get() {
+                    track()
+                    return value
+                },
+                set(newValue) {
+                    clearTimeout(timeout)
+                    timeout = setTimeout(() => {
+                        value = newValue
+                        trigger()
+                    }, delay)
+                }
+            }
+        })
+    }
+```
+在组件中使用：
+```html
+    <script setup>
+    import { useDebouncedRef } from './debouncedRef'
+    const text = useDebouncedRef('hello')
+    </script>
+
+    <template>
+        <input v-model="text" />
+    </template>
+```
+
+### shallowReactive()
+`reactive()` 的浅层作用形式。  
+一个浅层响应式对象里**只有根级别的属性是响应式的**。属性的值会被原样存储和暴露，这也意味着值为 `ref` 的属性**不会被自动解包了**。
