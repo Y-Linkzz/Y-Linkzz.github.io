@@ -574,3 +574,113 @@ watch 和 watchEffect 都能**响应式地执行有副作用的回调**，都享
 ### shallowReactive()
 `reactive()` 的浅层作用形式。  
 一个浅层响应式对象里**只有根级别的属性是响应式的**。属性的值会被原样存储和暴露，这也意味着值为 `ref` 的属性**不会被自动解包了**。
+
+
+### markRaw()  例如复杂的第三方类实例或 Vue 组件对象，不需要代理
+将一个对象标记为不可被转为代理。返回该对象本身。  
+
+### effectScope()
+**创建一个 effect 作用域**，可以捕获其中所创建的响应式副作用 (即计算属性和侦听器)，这样**捕获到的副作用可以一起处理**。
+```js
+    const scope = effectScope()
+
+    scope.run(() => {
+        const doubled = computed(() => counter.value * 2)
+
+        watch(doubled, () => console.log(doubled.value))
+
+        watchEffect(() => console.log('Count: ', doubled.value))
+    })
+
+    // 处理掉当前作用域内的所有 effect
+    scope.stop()
+```
+
+## 生命周期钩子
+
+### onServerPrefetch()
+如果这个钩子返回了一个 Promise，服务端渲染会在渲染该组件前等待该 Promise 完成。  
+这个钩子仅会在**服务端渲染中执行**，可以用于执行一些仅存在于**服务端的数据抓**取过程。
+
+## 依赖注入
+
+### provide() 依赖
+当使用 TypeScript 时，key 可以是一个被类型断言为 InjectionKey 的 symbol。
+```js
+    import { provide, inject } from 'vue'
+    import type { InjectionKey } from 'vue'
+
+    const key = Symbol() as InjectionKey<string>
+
+    provide(key, 'foo') // 若提供的是非字符串值会导致错误
+
+    const foo = inject(key) // foo 的类型：string | undefined
+```
+
+### inject()
+
+第一个参数是注入的 key。**Vue 会遍历父组件链，通过匹配 key 来确定所提供的值**。如果父组件链上**多个组件对同一个 key 提供了值**，那么离得**更近的组件**将会“**覆盖**”链上更远的**组件所提供的值**。如果没有能通过 key 匹配到值，inject() 将返回 undefined，除非提供了一个默认值。
+
+```js
+    import { inject } from 'vue'
+    import { fooSymbol } from './injectionSymbols'
+    // 注入值的默认方式
+    const foo = inject('foo')
+
+    // 注入响应式的值
+    const count = inject('count')
+
+    // 通过 Symbol 类型的 key 注入
+    const foo2 = inject(fooSymbol)
+
+    // 注入一个值，若为空则使用提供的默认值
+    const bar = inject('foo', 'default value')
+
+    // 注入一个值，若为空则使用提供的工厂函数
+    const baz = inject('foo', () => new Map())
+
+    // 注入时为了表明提供的默认值是个函数，需要传入第三个参数
+    const fn = inject('function', () => {}, false)
+```
+
+## 状态选项 this.$data
+该函数应当返回一个普通 JavaScript 对象，Vue 会将它转换为响应式对象。实例创建后，可以通过 `this.$data` 访问该响应式对象。组件实例也代理了该数据对象上所有的属性，因此 `this.a` 等价于 `this.$data.a`。
+
+以 `_` 或 `$` 开头的属性将**不会**被组件实例代理，因为它们可能和 Vue 的内置属性、API 方法冲突。你必须以 `this.$data._property` 的方式访问它们。  
+
+**不**推荐返回一个可能改变自身状态的对象，如浏览器 API 原生对象或是带原型的类实例等。理想情况下，返回的对象应是一个纯粹代表组件状态的普通对象。
+
+## Boolean 类型转换
+为了更贴近原生 boolean attributes 的行为，声明为 `Boolean` 类型的 props 有特别的类型转换规则。
+
+```js
+    <!-- 等同于传入 :disabled="true" -->
+    <MyComponent disabled /> // 例子1
+
+    <!-- 等同于传入 :disabled="false" -->
+    <MyComponent />
+
+    defineProps({
+        disabled: [Boolean, Number]
+    })
+    // 无论声明类型的顺序如何，Boolean 类型的特殊转换规则都会被应用。(这个是官网写的)
+
+
+    defineProps({
+        disabled: [String, Boolean]
+    })
+    // 例子1 结果为 ''
+
+    defineProps({
+        disabled: [Boolean, String]
+    })
+    // 例子1 结果为 true
+
+    // 可以看出如果有String类型，顺序还是有关系的
+    
+```
+<Demo disabled />
+
+<script setup>
+import Demo from '../../../compoment/demo.vue'
+</script>
