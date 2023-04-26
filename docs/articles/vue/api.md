@@ -650,7 +650,60 @@ watch 和 watchEffect 都能**响应式地执行有副作用的回调**，都享
 
 **不**推荐返回一个可能改变自身状态的对象，如浏览器 API 原生对象或是带原型的类实例等。理想情况下，返回的对象应是一个纯粹代表组件状态的普通对象。
 
-## Boolean 类型转换
+## defineProps() 宏
+
+`名字格式`: camelCase 形式
+`子组件传递 props`:  kebab-case 形式
+
+`defineProps()` 宏中的参数**不可以访问** `<script setup>` 中定义的其他变量，因为在编译时整个表达式都会被移到外部的函数中。
+
+```js
+    defineProps({
+        // 基础类型检查
+        // （给出 `null` 和 `undefined` 值则会跳过任何类型检查）
+        propA: Number,
+        // 多种可能的类型
+        propB: [String, Number],
+        // 必传，且为 String 类型
+        propC: {
+            type: String,
+            required: true
+        },
+        // Number 类型的默认值
+        propD: {
+            type: Number,
+            default: 100
+        },
+        // 对象类型的默认值
+        propE: {
+            type: Object,
+            // 对象或数组的默认值
+            // 必须从一个工厂函数返回。
+            // 该函数接收组件所接收到的原始 prop 作为参数。
+            default(rawProps) {
+            return { message: 'hello' }
+            }
+        },
+        // 自定义类型校验函数
+        propF: {
+            validator(value) {
+            // The value must match one of these strings
+            return ['success', 'warning', 'danger'].includes(value)
+            }
+        },
+        // 函数类型的默认值
+        propG: {
+            type: Function,
+            // 不像对象或数组的默认，这不是一个
+            // 工厂函数。这会是一个用来作为默认值的函数
+            default() {
+            return 'Default function'
+            }
+        }
+    })
+```
+
+### Boolean 类型转换
 为了更贴近原生 boolean attributes 的行为，声明为 `Boolean` 类型的 props 有特别的类型转换规则。
 
 ```js
@@ -663,7 +716,6 @@ watch 和 watchEffect 都能**响应式地执行有副作用的回调**，都享
     defineProps({
         disabled: [Boolean, Number]
     })
-    // 无论声明类型的顺序如何，Boolean 类型的特殊转换规则都会被应用。(这个是官网写的)
 
 
     defineProps({
@@ -679,8 +731,193 @@ watch 和 watchEffect 都能**响应式地执行有副作用的回调**，都享
     // 可以看出如果有String类型，顺序还是有关系的
     
 ```
-<Demo disabled />
+<!-- <Demo disabled />
 
 <script setup>
 import Demo from '../../../compoment/demo.vue'
-</script>
+</script> -->
+
+## computed 
+
+`computed() `方法期望接收一个 `getter` 函数，**返回**值为一个计算属性 `ref`。
+
+**Getter不应有副作用** : **不要在 getter 中做异步请求或者更改 DOM！**
+```js
+    const publishedBooksMessage = computed(() => {
+        return author.books.length > 0 ? 'Yes' : 'No'
+    })
+    
+    const firstName = ref('John')
+    const lastName = ref('Doe')
+    const fullName = computed({
+        // getter
+        get() {
+            return firstName.value + ' ' + lastName.value
+        },
+        // setter
+        set(newValue) {
+            // 注意：我们这里使用的是解构赋值语法
+            [firstName.value, lastName.value] = newValue.split(' ')
+        }
+    })
+
+```
+
+## 事件处理
+
+### 内联事件处理器
+`foo()` 和 `count++` 会被视为**内联事件处理器**。
+```html
+    <button @click="count++">Add 1</button>
+    <p>Count is: {{ count }}</p>
+
+    <!-- 使用特殊的 $event 变量 -->
+    <button @click="warn('Form cannot be submitted yet.', $event)">
+        Submit
+    </button>
+
+    <!-- 使用内联箭头函数 -->
+    <button @click="(event) => warn('Form cannot be submitted yet.', event)">
+        Submit
+    </button>
+```
+
+### 方法事件处理器
+`foo`、`foo.bar` 和 `foo['bar']` 会被视为**方法事件处理器**
+```html
+    <button @click="greet">Greet</button>
+```
+
+## 事件修饰符
+-   `.stop` : 单击事件将停止传递, 防止冒泡 (event.stopPropagation())
+-   `.prevent` : 取消默认事件 (event.preventDefault())
+-   `.self` : 是元素本身时才会触发事件处理器(事件处理器不来自子元素)
+-   `.capture` ： 先被外部处理 [事件捕获](/articles/javaScript/event-capturing-bubbling.html)
+-   `.once` : 最多被触发一次
+-   `.passive` : 防其中包含 `event.preventDefault()`,`@scroll.passive="onScroll"` (用于触摸事件的监听器，可以用来改善移动端设备的滚屏性能)
+
+## defineEmits() 宏
+
+`$emit` 方法**不能**在组件的 `<script setup>` 部分中使用。**必须**直接放置在 `<script setup>` 的**顶级作用域下**  
+
+
+```html
+    <script setup>
+        const emit = defineEmits(['inFocus', 'submit'])
+
+        function buttonClick() {
+            emit('submit')
+        }
+
+        // 对触发事件的参数进行验证
+        const emit = defineEmits({
+            // 没有校验
+            click: null,
+            submit(payload) {
+                // 通过返回值为 `true` 还是为 `false` 来判断
+                // 验证是否通过
+            }
+        })
+    </script>
+```
+
+**TypeScript**
+```html
+    <script setup lang="ts">
+        const emit = defineEmits<{
+        (e: 'change', id: number): void
+        (e: 'update', value: string): void
+        }>()
+    </script>
+```
+
+**emits 选项会影响一个监听器被解析为组件事件监听器，还是原生 DOM 事件监听器。被声明为组件事件的监听器不会被透传到组件的根元素上，且将从组件的 $attrs 对象中移除。**
+```html
+    <template>
+        <button @click="handleClick">Click me</button>
+    </template>
+
+    <script>
+    export default {
+        methods: {
+            handleClick() {
+                this.$emit('click')
+            }
+        }
+    }
+    </script>
+
+    <template>
+        <div>
+            <!-- "click" 事件监听器被声明为组件事件监听器 -->  
+            <!-- 它不会被透传到 "my-button" 组件的根元素上 -->
+            <!-- 也不会出现在组件的 $attrs 对象中 -->
+            <!-- 点击 "my-button" 组件时，只会触发 "my-button" 组件内部的 "click" 事件监听器 -->
+            <my-button @click="handleButtonClick"></my-button>
+        </div>
+    </template>
+
+    <script>
+    export default {
+        methods: {
+            handleButtonClick() {
+                console.log('Button clicked')
+            }
+        }
+    }
+    </script>
+```
+
+## defineExpose() 宏 / expose
+用于声明当组件实例被父组件通过模板引用访问时暴露的公共属性。  
+仅影响**用户定义的属性**——它不会过滤掉内置的组件实例属性。  
+```html
+    <script setup>
+    import { ref } from 'vue'
+
+    const a = 1
+    const b = ref(2)
+
+    defineExpose({
+        a,
+        b
+    })
+    </script>
+```
+
+
+`<script setup>` 的组件是默认关闭, **不会**暴露任何在 `<script setup>` 中声明的绑定
+```html
+    <script setup>
+        import { ref } from 'vue'
+
+        const a = 1 
+        const b = ref(2)
+
+    </script>
+
+    <!-- 编译后 -->
+    <script>
+    import { ref } from 'vue'
+
+    export default {
+        setup(props, { expose }) {
+            expose()  //<script setup> 语法糖是默认执行expose()
+            const a = 1
+            const b = ref(2)
+            return {
+                a,
+                b
+            }
+        },
+    }
+    </script>
+```
+
+
+
+
+
+
+
+
