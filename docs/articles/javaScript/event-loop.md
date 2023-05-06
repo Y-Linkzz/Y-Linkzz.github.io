@@ -39,13 +39,7 @@ Promise.then、 MutationObserver(优先级小于Promise，
 
 ![](/EventLoop.png)
 
-## setTimeout 异步
 
--   主线程执行完，才开始倒计时。
--   延迟时间始终是相对主线程执行完毕的那个时间算的
--   某个setTimeout需要花费大量的时间，如果这两个setTimeout时间的差值小于第一个setTimeout消耗的时间，程序会等待这个setTimeout执行完成后立即执行下一个setTimeout；如果差值大于消耗的时间，就按照和主程序约定的延迟（setTimeout里的第二个参数）执行即可
-
-总结：主线程遇到setTimeout，setTimeout会将该函数放入等待队列；主线程执行完毕，开始执行setTimeout（倒计时），根据队列里delay参数，执行函数；
 
 
 http://latentflip.com/loupe/?code=JC5vbignYnV0dG9uJywgJ2NsaWNrJywgZnVuY3Rpb24gb25DbGljaygpIHsKICAgIGNvbnNvbGUubG9nKCJIaSEiKTsKICAgIGNvbnNvbGUubG9nKCJDbGljayB0aGUgYnV0dG9uISIpOwogICAgc2V0VGltZW91dChmdW5jdGlvbiB0aW1lcigpIHsKICAgICAgICBjb25zb2xlLmxvZygnWW91IGNsaWNrZWQgdGhlIGJ1dHRvbiEnKTsgICAgCiAgICB9LCAxNTAwMCk7Cn0pOwoK!!!PGJ1dHRvbj5DbGljayBtZSE8L2J1dHRvbj4%3D
@@ -53,4 +47,21 @@ http://latentflip.com/loupe/?code=JC5vbignYnV0dG9uJywgJ2NsaWNrJywgZnVuY3Rpb24gb2
 
 https://roadmap.sh/javascript 
 思维导图
+
+
+```js
+    const foo = () => console.log("First");
+    const bar = () => setTimeout(() => console.log("Second"), 500);
+    const baz = () => console.log("Third");
+
+    bar();
+    foo();
+    baz();
+```
+
+![](event-loop.gif)
+
+
+
+
 

@@ -21,3 +21,20 @@ requestAnimationFrame也属于执行是异步执行的方法，但该方法既�
 
 ## setTimeout() / setInterval() 的每调用一次定时器的最小间隔是 4ms 
 最大延时值 : 包括 IE、Chrome、Safari、Firefox 在内的浏览器其内部以 32 位带符号整数存储延时。这就会导致如果一个延时 (delay) 大于 2147483647 毫秒 (大约 24.8 天) 时就会溢出，导致定时器将会被立即执行。
+
+
+```js
+    async function startCountdown() {
+      const { serverTimestamp, eventTimestamp } = await fetchTimestamps();
+      const timestampDiff = Math.floor(Date.now() / 1000) - serverTimestamp;
+
+      setInterval(() => {
+        const remainingTime = eventTimestamp + timestampDiff - Math.floor(Date.now() / 1000);
+        if (remainingTime <= 0) {
+          document.getElementById('countdown').innerText = '秒杀活动已经开始！';
+        } else {
+          updateCountdown(remainingTime);
+        }
+      }, 1000);
+    }
+```
