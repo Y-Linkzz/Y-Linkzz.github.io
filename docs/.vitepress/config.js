@@ -11,7 +11,7 @@ module.exports = {
         nav: [
             { text: '首页', link: '/' },
             { text: '文章', link: '/articles/' },
-        ], 
+        ],  
         sidebar: {
             'articles': autoGetSidebarOptionBySrcDir(path.resolve(__dirname, "../articles"))
             // 'articles': [{
@@ -22,8 +22,8 @@ module.exports = {
             //         { text: '概况', link: '/articles/' },
             //         { text: 'Vue', link: '/articles/vue' },
             //     ]
-            // }],     
-        },    
+            // }],      
+        },        
         socialLinks: [{ icon: "github", link: "https://github.com/Y-Linkzz/Y-Linkzz.github.io" }],
     }
 }
