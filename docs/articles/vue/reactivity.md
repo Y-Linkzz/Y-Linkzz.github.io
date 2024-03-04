@@ -170,5 +170,29 @@ Vue 的响应性系统可以自动跟踪依赖关系，但在某些情况下，�
     count.value++
 ```
 
+## 响应式的本质
+``函数与数据的关联``
+
+`函数`: 被监控的函数（vue2的watcher; vue3的render[模板里]、watchEffect、computed、watch）  
+`数据`：响应式数据 && 必须在函数中用到
+
+```js
+
+    const doubleCount = ref(0)
+    watchEffect(()=>{
+        doubleCount.value = props.count * 2   
+        // props是响应式数据，当它改变时，会重新调用函数
+    })
 
 
+    function useDouble(count){
+        const doubleCount = ref(count * 2)
+        watchEffect(()=>{
+            doubleCount.value = count * 2   
+            // props才是响应式数据，count不是响应式数据
+        })
+        return doubleCount
+    }
+    const doubleCount = useDouble(props.count)   
+    // doubleCount 不会改变； 改法：将整个props传入
+```
