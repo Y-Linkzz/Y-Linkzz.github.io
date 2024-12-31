@@ -178,11 +178,17 @@
 
 ### ref 响应式对象中的解包
 当一个 `ref` 被**嵌套在一个响应式对象中**，作为**属性被访问或更改时**，它会**自动解包**，因此会表现得和一般的属性一样：
+
+一个 ref 会在作为响应式对象的属性被访问或修改时自动解包。换句话说，**它的行为就像一个普通的属性**
+
 ```js
     const count = ref(0)
     const state = reactive({
         count
     })
+
+    const { count : objCount} = state
+    // 这里只是简单的赋值，并没有把ref对象赋值给objCount，所有objCount不具有响应式
 
     console.log(state.count) // 0
 
@@ -190,6 +196,27 @@
     console.log(count.value) // 1
 ```
 只有当**嵌套在一个深层响应式对象内时**，才会发生 `ref` **解包**。当其作为**浅层响应式对象**(`shallowReactive`)的属性被访问时不会解包。
+
+**在模板中解包的注意事项**
+```html
+    <script setup>
+        const count = ref(0)
+        const object = { id: ref(1) }
+    </script>
+    <template>
+        <p>
+            <!-- 表达式按预期工作 -->
+            {{ count + 1 }}
+            
+            <!-- 这个是错误的, 渲染的结果将是 [object Object]1-->
+            <!-- 因为在计算表达式时 object.id 没有被解包，仍然是一个 ref 对象 -->
+            {{ object.id + 1 }} 
+
+            <!-- 这个可以正常渲染为1，如果 ref 是文本插值的最终计算值 (即 {{ }} 标签)，等价于 {{ object.id.value }}-->
+            {{ object.id }}  
+        </p>
+    </template>
+```
 
 ### 数组和集合类型的 ref 解包
 当 `ref` 作为`响应式数组`或像 `Map` 这种原生集合类型的元素被访问时，**不会进行解包**。
@@ -213,6 +240,8 @@
 若要**避免深层响应式转换**，只想**保留对这个对象顶层次访问的响应性**，请使用 `shallowReactive()` 作替代。 
 
 返回的对象以及其中嵌套的对象都会通过 `ES Proxy` 包裹，因此**不等于源对象**，**建议只使用响应式代理**，避免使用原始对象。
+
+如果要整体替换，用Object.assign
 
 ## readonly()
 接受一个对象 (不论是响应式还是普通的) 或是一个 ref，返回**一个原值的只读代理**。  
@@ -270,7 +299,7 @@
 直接给 `watch()` 传入一个**响应式对象**，会**隐式地创建一个深层侦听器**——该回调函数在所有嵌套的变更时都会被触发：
 ```js
     const obj = reactive({ count: 0 })
-
+    // 监视【reactive】的定义的【对象类型】数据，默认是开启深度监视的，不能关闭的
     watch(obj, (newValue, oldValue) => {
     // 在嵌套的属性变更时触发
     // 注意：`newValue` 此处和 `oldValue` 是相等的
@@ -286,6 +315,32 @@
             // 仅当 state.someObject 被替换时触发
         }
     )
+
+
+    const obj = reactive({
+        car : {
+            a : 1
+        }
+    })
+    // 当监听的是一个对象
+    watch(obj.car,()=>{
+        // obj.car.a = 2 可以触发监听
+        // obj.car = { a : 2 } 不会触发监听，因为地址变了，监听的的是旧地址
+    })
+    watch(()=>obj.car,()=>{
+        // obj.car.a = 2 不会触发监听
+        // obj.car = { a : 2 } 可以触发监听，因为函数返回的是一个对象地址，当地址变了会触发监听
+    })
+    // 如果都要监听
+    watch(()=>obj.car,()=>{
+        // obj.car.a = 2 触发监听
+        // obj.car = { a : 2 } 触发监听
+    },
+    { deep: true })
+
+    // 总结，凡是监听对象某个属性，都写成函数
+ 
+    
 
     watch(
         () => state.someObject,
@@ -319,6 +374,9 @@
         data.value = await response
     })
 ```
+
+若修改的是ref定义的对象中的属性，newValue 和 oldValue 都是新值，因为它们是同一个对象
+若修改的是ref定义的对象，newValue 是新值，oldValue是旧值，因为不是同一个对象
 
 ## watchEffect() 
 立即运行一个函数，同时响应式地追踪其依赖，并在依赖更改时重新执行。(立即执行是为了追踪依赖)

@@ -134,6 +134,78 @@
     </template>
 ```
 
+### 从 Vue 3.4 开始，推荐的实现方式是使用 defineModel() 宏
+```html
+    <!-- Child.vue -->
+     <template>
+        <div>Parent bound v-model is: {{ model }}</div>
+        <button @click="update">Increment</button>
+    </template>
+    <script setup>
+        // 它的 .value 和父组件的 v-model 的值同步；
+        // 当它被子组件变更了，会触发父组件绑定的值一起更新
+        // defineModel() 返回的值是一个 ref
+        const model = defineModel()
+        function update() {
+            model.value++
+        }
+
+        // 使 v-model 必填
+        const model = defineModel({ required: true })
+
+        // 提供一个默认值
+        /**
+         * 如果为 defineModel prop 设置了一个 default 值且父组件没有为该 prop 提供任何值，会导致父组件与子组件之间不同步。
+         * 在下面的示例中，父组件的 myRef 是 undefined，而子组件的 model 是 1
+         */
+        // 子组件：
+        const model = defineModel({ default: 1 })
+        // 父组件
+        const myRef = ref()
+
+        // v-model 的参数
+        <MyComponent v-model:title="bookTitle" />
+        const title = defineModel('title')
+        // const title = defineModel('title', { required: true })
+
+        // 多个 v-model 绑定
+        <UserName
+            v-model:first-name="first"
+            v-model:last-name="last"
+        />
+        const firstName = defineModel('firstName')
+        const lastName = defineModel('lastName')
+        
+        // 处理 v-model 修饰符
+        <MyComponent v-model.capitalize="myText" />
+        const [model, modifiers] = defineModel()
+        console.log(modifiers) // { capitalize: true }
+        
+        const [model, modifiers] = defineModel({
+            set(value) {
+                if (modifiers.capitalize) {
+                    return value.charAt(0).toUpperCase() + value.slice(1)
+                }
+                return value
+            }
+        })
+
+        // 带参数的 v-model 修饰符
+        <UserName
+            v-model:first-name.capitalize="first"
+            v-model:last-name.uppercase="last"
+        />
+        const [firstName, firstNameModifiers] = defineModel('firstName')
+        const [lastName, lastNameModifiers] = defineModel('lastName')
+
+        console.log(firstNameModifiers) // { capitalize: true }
+        console.log(lastNameModifiers) // { uppercase: true }
+        
+    </script>
+
+    
+```
+
 
 ## v-pre
 跳过该元素及其所有子元素的编译  
@@ -178,4 +250,39 @@
 
 `v-cloak` 会保留在所绑定的元素上，直到相关组件**实例被挂载后才移除**。  
 `[v-cloak] { display: none }` 这样的 CSS 规则，它可以在组件**编译完毕前隐藏原始模板**。
+
+
+## VUE3.5 模板引用 ref 
+```html
+    <script setup>
+    import { useTemplateRef, onMounted } from 'vue'
+
+    // 第一个参数必须与模板中的 ref 值匹配
+    const input = useTemplateRef('my-input')
+
+    onMounted(() => {
+        input.value.focus()
+    })
+
+    // 3.5以前
+    // const input = ref()   const itemRefs = ref([])
+
+    // itemRefs为数组时，ref 数组并不保证与源数组相同的顺序
+    // 比如一个列表在前面添加一个子集，ref数组会把新添加的放在最后一个
+    
+    function getAllChild(refs){
+        // refs['my-input'] 不用.value，因为refs是reactive
+    }
+    </script>
+
+    <template>
+    <input ref="my-input" />
+
+    <!-- $refs 获取全部的ref -->
+    <button @click=getAllChild($refs)></button>
+    </template>
+
+
+
+```
 
