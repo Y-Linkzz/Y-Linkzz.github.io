@@ -492,3 +492,310 @@
 
 
 ## 装饰器
+装饰器本质是一种特殊的函数，它可以对：类、属性、方法、参数进行扩展，同时能让代码更简洁
+
+### 类装饰器
+类装饰器是一个应用在`类声明`上的`函数`，可以为类添加额外的功能，或添加额外的逻辑
+```js
+    /**
+     * Demo函数会在Person类定义时执行
+     * 参数说明：
+     * target参数是被装饰的类，即：Person
+     */
+    function Demo(target: Function){
+        console.log(target)  // 打印 Person类
+    }
+
+    // 使用装饰器
+    @Demo
+    class Person {
+
+    }
+```
+
+
+**应用举例**：
+```js
+    function CustomString(target: Function){
+        // 向被装饰类的原型上添加自定义的 toString 方法
+        target.prototype.toString = function () {
+            return JSON.stringify(this)
+        }
+        // 封闭其原型对象，禁止随意操作其原型对象
+        Object.seal(target.prototype)
+    }
+
+    @CustomString
+    class Person {
+        constructor(
+            public name: string
+        ){}
+    }
+    let p1 = new Person('11',18)
+    console.log(p1.toString())  // 原本是[object,object]   现在可以打印{"name": "11"}
+```
+
+`关于返回值`      
+类装饰器有返回值，若类装饰器返回一个新的类，那这个新类将替换被装饰的类
+
+
+`关于构造类型`    
+TS中的 `Function` 定义太广泛，包括：普通函数、箭头函数、方法等。但并非 `Function`类型的函数都可以被 `new`
+关键字实例化。例如箭头函数不能被实例化。
+```js
+    // 仅声明构造类型
+    /**
+     * new : 该类型是可以用new操作符调用
+     * ...args : 构造器可以接受【任意数量】的参数
+     * any[] ： 构造器可以接受【任意类型】的参数
+     * {} ： 返回类型是对象（非null、非undefined的对象）
+     */
+    type Constructor = new (...args:any[]) => {}
+
+    function test(fn: Constructor){}
+
+
+    // 声明构造类型 + 指定静态的属性
+    type Constructor = {
+        new (...args:any[]): {}
+        wife: string 
+    }
+    function test(fn: Constructor){}
+    class Person {
+        static wife = 'ss'
+    }
+    test(Person)
+
+```
+
+`替换被装饰的类` 
+```js
+    type Constructor = new (...args:any[]) => {}
+    interface Person {  // 接口和类同名，TS会自动合并
+        getTime(): string
+    }
+    // <T extends Constructor> 解释：泛型是必须可以被new关键字调用的类
+    function LogTime<T extends Constructor>(target: T){
+        return class extends target {
+            createdTime: Date
+            constructor(...args:any[]){
+                super(...args)
+                this.createdTime = new Date()
+            }
+        }
+        getTime(){
+            return `${this.createdTime}`
+        }
+    }
+
+    @LogTime
+    class Person {
+        constructor(
+            public name: string
+        ){
+
+        }
+    }
+
+    const p1 = new Person('as',18)
+
+    console.log(p1.getTime())  // 如果没有添加interface Person 接口，getTime会报错
+```
+
+  
+### 装饰器工厂
+为了传参
+```js
+    interface Person {
+        introduce: () => void
+    }
+    // 定义一个装饰器工厂，接受参数，返回一个类装饰器
+    function LogInfo(n: number){
+        return function(target: Function) {
+            target.prototype.introduce = function () {
+                for(let i = 0; i < n; i++){
+                    console.log(11)
+                }
+            }
+        }
+    }
+
+    @LogInfo(1)
+    class Person {
+
+    }
+```
+
+
+
+### 装饰器组合
+装饰器可以组合使用，执行顺序：先【由上到下】的执行所有装饰器工厂，依次获取装饰器，然后再【由下到上】
+执行所有装饰器
+```js
+    function test1(target: Function) {
+        console.log('test1')
+    }
+    function test2() {
+        console.log('test2工厂')
+        return function(target: Function) {
+            console.log('test2')
+        }
+    }
+    function test3() {
+        console.log('test3工厂')
+        return function(target: Function) {
+            console.log('test3')
+        }
+    }
+    function test4(target: Function) {
+        console.log(test4)
+    }
+
+    @test1
+    @test2()
+    @test3()
+    @test4
+    class Person {}
+
+    // 一开始从上到下抽出工厂先执行，工厂执行完，再从下到上可以执行装饰器
+    // 打印结果：test2工厂 test3工厂 test4 test3 test2 test1
+```
+
+
+### 属性装饰器
+响应式属性
+```js
+    /**
+     * target: 对于静态属性(static)来说值是类, 对于实例属性来说是类的原型对象
+     * @Demo static age: number
+     * properKey: 属性名
+     */
+
+
+    // 声明一个装饰器函数State，用于捕获数据的修改
+    function State(target: object, properKey: string){
+        // 存储属性的内布值
+        let key - `__${properKey}`
+
+        // 使用 Object.defineProperty 替换类的原始属性
+        // 重新定义属性,使其使用自定义的 getter 和 setter
+        Object.defineProperty(target, properKey, {
+            get(){
+                return this[key]
+            }
+            set(newVal: string){
+                // 一些响应式操作在这实现
+                this[key] = newVal
+            },
+            enumerabel: true,  //枚举,可参与循环遍历
+            configurable: true // 是否允许删除
+        })
+    }
+
+    class Person {
+        name: string
+        @State age: number
+        constructor(name: string){
+            this.name = name
+            this.age = age 
+        }
+    }
+```
+
+### 方法装饰器
+例子: 生命周期
+```js
+    /**
+     * target: 对于静态方法(static)来说值是类, 对于实例方法来说是类的原型对象
+     * properKey: 方法的名称
+     * descriptor: 方法的描述对象,其中value属性是被装饰的方法
+     * 描述对象 { configurable: true, enumerabel : false, ...}
+     */
+
+    function Logger(target: object, properKey: string, descriptor: PropertyDescriptor){
+        // 保存原始方法
+        const original = descriptor.value
+        // 替换原始方法
+        descriptor.value = function (...args: any[]){
+            console.log(`${properKey}开始执行`)
+            // call只能一个个传所以用了...args
+            const result = original.call(this,...args)
+            console.log(`${properKey}执行完毕`)
+            return result
+        }
+    }
+    function Validate(maxValue: number){
+        return function (target: object, properKey: string, descriptor: PropertyDescriptor){
+            const original = descriptor.value
+            descriptor.value = function (...args: any[]){
+                if(args[0] > maxValue){
+                    throw new Error('年龄非法')
+                }
+                return original.apply(this,args) // apply可以传数组
+            }
+        }
+    }
+
+    class Person {
+        name: string
+        constructor(name: string){
+            this.name = name
+        },
+        @Logger speak(){
+            console.log(`speak`)
+        }
+        @Validate(120)
+        static isAdult(age: number){
+            return age >= 18
+        }
+    }
+```
+
+
+### 访问器装饰器
+set  get  访问器
+```js
+    /**
+     * target: 
+     *    1.对于实例访问器来说值是[所属类的原型对象]
+     *    2.对于静态访问器来说值是[所属类]
+     * properKey: 访问器的名称
+     * descriptor: 描述对象
+     */
+
+    function RangeValidate(min: number, max: number){
+        return function (target: object, properKey: string, descriptor: PropertyDescriptor){
+            // 保存原始的setter
+            const originalSetter = descriptor.set
+            // 重写setter
+            descriptor.set = function(value){
+                if(value < min || value > max){
+                    throw new Error('报错')
+                }
+                if(originalSetter){
+                    originalSetter.call(this,value)
+                }
+            }
+        }
+    }
+
+    // 天气
+    class Weather {
+        private _temp: number // 温度
+        constructor(_temp: string){
+            this._temp = _temp
+        },
+        @RangeValidate(-50,50)
+        set temp(value){
+            this._temp = value
+        }
+        get temp(){
+            return this._temp
+        }
+    }
+
+    const p1 = new Weather()
+    p1.temp = 9000  // 会报错
+```
+
+### 参数装饰器
